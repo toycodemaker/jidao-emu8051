@@ -22,8 +22,12 @@
  *
  * (i.e. the MIT License)
  *
- * emu.c
+ * main.cpp
  * Curses-based emulator front-end
+ * ---------------------------------------------------------------------------
+ * Significant refactoring and modifications by Liu Qitao (2026).
+ * Copyright (c) 2026 Liu Qitao.
+ * This file remains under the terms of the original MIT License.
  */
 
 #include <iostream>

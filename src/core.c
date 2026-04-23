@@ -24,6 +24,10 @@
  *
  * core.c
  * General emulation functions
+ * ---------------------------------------------------------------------------
+ * Significant refactoring and modifications by Liu Qitao (2026).
+ * Copyright (c) 2026 Liu Qitao.
+ * This file remains under the terms of the original MIT License.
  */
 
 #define T0_MODE3_MASK (TMODMASK_M0_0 | TMODMASK_M1_0)
