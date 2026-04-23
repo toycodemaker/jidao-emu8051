@@ -20,5 +20,7 @@ emu
 .\#*
 *~
 ~*
+.*~
 
+#build dir
 /build/
