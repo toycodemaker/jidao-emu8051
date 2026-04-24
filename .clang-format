@@ -1,0 +1,20 @@
+BasedOnStyle: LLVM
+
+# 缩进设置
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+
+# 严格锁定布局
+BreakBeforeBraces: Attach         # 保持原有的左大括号位置
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BreakAfterJavaFieldAnnotations: false
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: false
+ColumnLimit: 0                    # 关键：设置为0表示不进行自动换行
+IndentCaseLabels: false
+KeepEmptyLinesAtTheStartOfBlocks: true
+PointerAlignment: Left
+ReflowComments: false
