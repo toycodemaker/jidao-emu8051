@@ -74,7 +74,8 @@ int pout[4] = {0};
 int breakpoint = -1;
 
 // returns time in 1ms units
-int getTick() {
+int getTick() 
+{
 #ifdef _MSC_VER
   return GetTickCount();
 #else
@@ -84,7 +85,8 @@ int getTick() {
 #endif
 }
 
-void emu_sleep(int value) {
+void emu_sleep(int value) 
+{
 #ifdef _MSC_VER
   Sleep(value);
 #else
@@ -92,148 +94,30 @@ void emu_sleep(int value) {
 #endif
 }
 
-void emu_sfrwrite_SBUF(struct em8051* aCPU, uint8_t aRegister) {
-  aCPU->serial_out_remaining_bits = 8;
-}
 
-uint8_t emu_sfrread(struct em8051* aCPU, uint8_t aRegister) {
-  std::print("Unsupported Function: {}", __FUNCTION__);
-  return 0;
-}
-
-void hello(struct em8051* aCPU, int changeto) {
-}
-
-void show_emu(const em8051* aCPU) {
-  char ASMcommand[256]{};
-  decode((em8051*)aCPU, aCPU->mPC, ASMcommand);
+void show_emu(const em8051& aCPU) 
+{
   //if (aCPU->mPC < 200)
   std::println("PC: {:4x}, ASM Command:{}",
-               aCPU->mPC,
-               ASMcommand);
-  std::println("The Command delay Tick is {}", aCPU->mTickDelay);
-  if (aCPU->mTickDelay != 1)
-    std::cin.get();
+               aCPU.mPC,
+               aCPU.decode(aCPU.mPC));
+  std::println("The Command delay Tick is {}", aCPU.mTickDelay);
 }
 
-int main(int parc, char** pars) {
-  struct em8051 emu;
-  int ticked = 1;
 
-  memset(&emu, 0, sizeof(emu));
-  emu.mCodeMemMaxIdx = 65536 - 1;
-  emu.mCodeMem = (unsigned char*)calloc(emu.mCodeMemMaxIdx + 1, sizeof(unsigned char));
-  emu.mExtDataMaxIdx = 65536 - 1;
-  emu.mExtData = (unsigned char*)calloc(emu.mExtDataMaxIdx + 1, sizeof(unsigned char));
-  emu.mUpperData = (unsigned char*)calloc(128, sizeof(unsigned char));
-  emu.except = &hello;
-  emu.xread = NULL;
-  emu.xwrite = NULL;
-
-  emu.sfrwrite[REG_SBUF] = emu_sfrwrite_SBUF;
-
-  emu.sfrread[REG_P0] = emu_sfrread;
-  emu.sfrread[REG_P1] = emu_sfrread;
-  emu.sfrread[REG_P2] = emu_sfrread;
-  emu.sfrread[REG_P3] = emu_sfrread;
-
-  reset(&emu, 1);
-  load_obj(&emu, "r.ihx");
+int main(int parc, char** pars) 
+{
+  em8051 emu{"r.ihx"};
 
   // Minimum core Loop
   int num = 1;
   while (--num || std::cin >> num) {
-    int targettime;
-    unsigned int targetclocks;
-    targetclocks = 0;
-    targettime = getTick();
+    //emu.tick();
+    emu.do_op();
 
-    do {
-      /*
-      if (opt_step_instruction)
-      {
-        ticked = 0;
-        while (!ticked)
-        {
-          targetclocks--;
-          clocks += 12;
-          ticked = tick(&emu);
-        }
-      }
-      else
-      {
-        targetclocks--;
-        clocks += 12;
-        ticked = tick(&emu);
-      }
-      */
-      {
-        targetclocks--;
-        clocks += 12;
-        ticked = tick(&emu);
-      }
-
-    } while (targettime > getTick() && targetclocks > 0);
-
-    while (targettime > getTick()) {
-      emu_sleep(1);
-    }
-
-    show_emu(&emu);
+    show_emu(emu);
   }
   //}while (true);
 
   return EXIT_SUCCESS;
-}
-
-int readbyte(FILE* f) {
-  char data[3];
-  data[0] = fgetc(f);
-  data[1] = fgetc(f);
-  data[2] = 0;
-  return strtol(data, NULL, 16);
-}
-
-int load_obj(struct em8051* aCPU, char* aFilename) {
-  FILE* f;
-  if (aFilename == 0 || aFilename[0] == 0)
-    return -1;
-  f = fopen(aFilename, "r");
-  if (!f)
-    return -1;
-  if (fgetc(f) != ':') {
-    fclose(f);
-    return -2; // unsupported file format
-  }
-  while (!feof(f)) {
-    int recordlength;
-    int address;
-    int recordtype;
-    int checksum;
-    int i;
-    recordlength = readbyte(f);
-    address = readbyte(f);
-    address <<= 8;
-    address |= readbyte(f);
-    recordtype = readbyte(f);
-    if (recordtype == 1)
-      return 0; // we're done
-    if (recordtype != 0)
-      return -3;                                                              // unsupported record type
-    checksum = recordtype + recordlength + (address & 0xff) + (address >> 8); // final checksum = 1 + not(checksum)
-    for (i = 0; i < recordlength; i++) {
-      int data = readbyte(f);
-      checksum += data;
-      aCPU->mCodeMem[address + i] = data;
-    }
-    i = readbyte(f);
-    checksum &= 0xff;
-    checksum = 256 - checksum;
-    if (i != (checksum & 0xff))
-      return -4; // checksum failure
-    while (fgetc(f) != ':' && !feof(f)) {
-    } // skip newline
-  }
-  fclose(f);
-  return -5;
 }

@@ -30,11 +30,23 @@
  * This file remains under the terms of the original MIT License.
  */
 
+#include <cstdint>
+#include <string>
+#include <string_view>
 #define T0_MODE3_MASK (TMODMASK_M0_0 | TMODMASK_M1_0)
 
 #include "emu8051.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+
+#ifdef _MSC_VER
+#include <windows.h>
+#undef MOUSE_MOVED
+#else
+#include <sys/time.h>
+#include <unistd.h>
+#endif
 
 static void serial_tx(em8051* aCPU) {
   // Test if still something to send
@@ -431,7 +443,7 @@ bool tick(em8051* aCPU) {
   return ticked;
 }
 
-uint8_t decode(em8051* aCPU, uint16_t aPosition, char* aBuffer) {
+uint8_t decode(const em8051* aCPU, uint16_t aPosition, char* aBuffer) {
   bool is_idle = (aCPU->mSFR[REG_PCON]) & 0x01;
   if (is_idle) {
     strcpy(aBuffer, "IDLE");
@@ -442,7 +454,7 @@ uint8_t decode(em8051* aCPU, uint16_t aPosition, char* aBuffer) {
     strcpy(aBuffer, "POWER DOWN");
     return 0;
   }
-  return aCPU->dec[aCPU->mCodeMem[aPosition & (aCPU->mCodeMemMaxIdx)]](aCPU, aPosition, aBuffer);
+  return aCPU->dec[aCPU->mCodeMem[aPosition & (aCPU->mCodeMemMaxIdx)]]((em8051*)aCPU, aPosition, aBuffer);
 }
 
 void disasm_setptrs(em8051* aCPU);
@@ -489,4 +501,113 @@ void reset(em8051* aCPU, bool aWipe) {
   // Clean Serial
   aCPU->serial_interrupt_trigger = 0;
   aCPU->serial_out_remaining_bits = 0;
+}
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////
+///This is the Definition of The Class emu8051 ////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////
+
+em8051::em8051()
+{
+  memset(this, 0, sizeof(em8051));
+  mCodeMemMaxIdx = 65536 - 1;
+  mCodeMem = (unsigned char*)calloc(mCodeMemMaxIdx + 1, sizeof(unsigned char));
+  mExtDataMaxIdx = 65536 - 1;
+  mExtData = (unsigned char*)calloc(mExtDataMaxIdx + 1, sizeof(unsigned char));
+  mUpperData = (unsigned char*)calloc(128, sizeof(unsigned char));
+  xread = NULL;
+  xwrite = NULL;
+
+  reset(true);
+}
+
+
+em8051::em8051(std::string_view filename)
+  :em8051()
+{
+  load_obj(filename);
+}
+
+
+void em8051::reset(bool clear_all)
+{
+  ::reset(this, clear_all);
+}
+
+bool em8051::tick()
+{
+  return ::tick(this);
+}
+
+
+std::string em8051::decode(uint16_t position) const
+{
+  char decode_command[64];
+  ::decode(this, position, decode_command);
+  return std::string{decode_command};
+}
+
+
+uint8_t em8051::do_op()
+{
+  return ::do_op(this);
+}
+
+
+
+//private functions
+
+bool em8051::load_obj(std::string_view aFilename) {
+  auto readbyte = [](FILE* f) {
+    char data[3];
+    data[0] = fgetc(f);
+    data[1] = fgetc(f);
+    data[2] = 0;
+    return strtol(data, NULL, 16);
+  };
+
+  FILE* f;
+  if (aFilename.size() == 0 || aFilename[0] == 0)
+    return -1;
+  f = fopen(aFilename.data(), "r");
+  if (!f)
+    return -1;
+  if (fgetc(f) != ':') {
+    fclose(f);
+    return -2; // unsupported file format
+  }
+  while (!feof(f)) {
+    int recordlength;
+    int address;
+    int recordtype;
+    int checksum;
+    int i;
+    recordlength = readbyte(f);
+    address = readbyte(f);
+    address <<= 8;
+    address |= readbyte(f);
+    recordtype = readbyte(f);
+    if (recordtype == 1)
+      return 0; // we're done
+    if (recordtype != 0)
+      return -3;                                                              // unsupported record type
+    checksum = recordtype + recordlength + (address & 0xff) + (address >> 8); // final checksum = 1 + not(checksum)
+    for (i = 0; i < recordlength; i++) {
+      int data = readbyte(f);
+      checksum += data;
+      mCodeMem[address + i] = data;
+    }
+    i = readbyte(f);
+    checksum &= 0xff;
+    checksum = 256 - checksum;
+    if (i != (checksum & 0xff))
+      return -4; // checksum failure
+    while (fgetc(f) != ':' && !feof(f)) {
+    } // skip newline
+  }
+  fclose(f);
+  return -5;
 }
