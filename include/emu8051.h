@@ -26,6 +26,8 @@
  * Emulator core header file
  */
 
+#include <cassert>
+#include <cstdint>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string>
@@ -65,6 +67,11 @@ typedef uint8_t (*em8051xread)(em8051 *aCPU, uint16_t aAddress);
 class em8051
 {
 public:
+  //some type used for the class
+  using Byte = unsigned char;
+  using Address = uint16_t;
+
+
   em8051();
   em8051(std::string_view filename);
 
@@ -88,18 +95,83 @@ public:
 
   // Alternate way to execute an opcode (switch-structure instead of function pointers)
   uint8_t do_op();
+
+  
+  //These functions is used for read and set the 
+  //mem context of the 8051/8052 MCU
+  Byte read_code_mem(Address address) const
+  {
+    return mCodeMem[mCodeMemMaxIdx&address];
+  }
+  Byte set_code_mem(Address address, Byte date)
+  {
+    return mCodeMem[mCodeMemMaxIdx&address]=date;
+  }
+
+  //As we all know that the traditional 8051 MCU
+  //only have 128 byte RAM, BUT the 8052 has 256
+  //bytes, and divide into two Parts:lower(0~127B)
+  //and upper(128B~255B). So the Two function below
+  //will figure out this two situation
+  Byte read_ram_mem(Address address) const
+  {
+    assert(address <= 0xFF);
+    if (at_lower_ram(address)) {
+      return mLowerData[address];
+    }else {
+      assert(mUpperData != nullptr);
+      return mUpperData[address];
+    }
+  }
+  Byte set_ram_mem(Address address, Byte date)
+  {
+    assert(address <= 0xFF);
+    if (at_lower_ram(address)) {
+      return mLowerData[address] = date;
+    }else {
+      assert(mUpperData != nullptr);
+      return mUpperData[address] = date;
+    }
+  }
+
+  Byte read_sfr_mem(Address address) const
+  {
+    assert(address < 0xFF && address > 0x80);
+    return mSFR[address - 0x80];
+  }
+  Byte set_sfr_mem(Address address, Byte date)
+  {
+    assert(address < 0xFF && address > 0x80);
+    return mSFR[address - 0x80] = date;
+  }
+
+  Byte read_extra_mem(Address address) const
+  {
+    return mExtData[address&mExtDataMaxIdx];
+  }
+  Byte set_extra_mem(Address address, Byte date)
+  {
+    return mExtData[address&mExtDataMaxIdx] = date;
+  }
+
 private:
   bool load_obj(std::string_view filename);
+  bool at_lower_ram(Address address)const {
+    return address < 0x80;
+  }
+
+  static void reset(em8051* aCPU, bool);
+private:
 public:
   //The original data And will stay here before refactoring
-  unsigned char *mCodeMem; // 1k - 64k, must be power of 2
-  uint16_t mCodeMemMaxIdx;
-  unsigned char *mExtData; // 0 - 64k, must be power of 2
-  uint16_t mExtDataMaxIdx;
-  unsigned char mLowerData[128]; // 128 bytes
-  unsigned char *mUpperData; // 0 or 128 bytes; leave to NULL if none
-  unsigned char mSFR[128]; // 128 bytes; (special function registers)
-  uint16_t mPC; // Program Counter; outside memory area
+  Byte *mCodeMem; // 1k - 64k, must be power of 2
+  Address mCodeMemMaxIdx;
+  Byte *mExtData; // 0 - 64k, must be power of 2
+  Address mExtDataMaxIdx;
+  Byte mLowerData[128]; // 128 bytes
+  Byte *mUpperData; // 0 or 128 bytes; leave to NULL if none
+  Byte mSFR[128]; // 128 bytes; (special function registers)
+  Address mPC; // Program Counter; outside memory area
   uint8_t mTickDelay; // How many ticks should we delay before continuing
   em8051operation op[256]; // function pointers to opcode handlers
   em8051decoder dec[256]; // opcode-to-string decoder handlers    
@@ -112,33 +184,16 @@ public:
   // Internal values for interrupt services etc.
   uint8_t mInterruptActive;
   // Stored register values for interrupts (exception checking)
-  uint8_t int_a[2];
-  uint8_t int_psw[2];
-  uint8_t int_sp[2];
+  Byte int_a[2];
+  Byte int_psw[2];
+  Byte int_sp[2];
 
   // Internal handling of UART
   char serial_out[18]; // The shown size is only 18 chars
-  uint8_t serial_out_idx;
-  uint8_t serial_out_remaining_bits;
+  Byte serial_out_idx;
+  Byte serial_out_remaining_bits;
   bool serial_interrupt_trigger;
 };
-
-// set the emulator into reset state. Must be called before tick(), as
-// it also initializes the function pointers. aWipe tells whether to reset
-// all memory to zero.
-//void reset(em8051 *aCPU, bool aWipe);
-
-// run one emulator tick, or 12 hardware clock cycles.
-// returns "true" if a new operation was executed.
-//bool tick(em8051 *aCPU);
-
-// decode the next operation as character string.
-// buffer must be big enough (64 bytes is very safe). 
-// Returns length of opcode.
-//uint8_t decode(em8051 *aCPU, uint16_t aPosition, char *aBuffer);
-
-// Load an intel hex format object file. Returns negative for errors.
-//int load_obj(em8051 *aCPU, char *aFilename);
 
 // Alternate way to execute an opcode (switch-structure instead of function pointers)
 uint8_t do_op(em8051 *aCPU);

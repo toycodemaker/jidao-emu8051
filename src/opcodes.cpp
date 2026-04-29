@@ -53,12 +53,14 @@
 
 static uint8_t read_mem(em8051* aCPU, uint8_t aAddress) {
   if (aAddress > 0x7f) {
+    /*
     if (aCPU->sfrread[aAddress - 0x80])
       return aCPU->sfrread[aAddress - 0x80](aCPU, aAddress);
     else
-      return aCPU->mSFR[aAddress - 0x80];
+    */
+    return aCPU->read_sfr_mem(aAddress);
   } else {
-    return aCPU->mLowerData[aAddress];
+    return aCPU->read_ram_mem(aAddress);
   }
 }
 

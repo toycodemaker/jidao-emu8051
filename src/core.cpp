@@ -460,7 +460,7 @@ uint8_t decode(const em8051* aCPU, uint16_t aPosition, char* aBuffer) {
 void disasm_setptrs(em8051* aCPU);
 void op_setptrs(em8051* aCPU);
 
-void reset(em8051* aCPU, bool aWipe) {
+void em8051::reset(em8051* aCPU, bool aWipe) {
   // clear memory, set registers to bootup values, etc
   if (aWipe) {
     memset(aCPU->mCodeMem, 0, aCPU->mCodeMemMaxIdx + 1);
@@ -534,7 +534,7 @@ em8051::em8051(std::string_view filename)
 
 void em8051::reset(bool clear_all)
 {
-  ::reset(this, clear_all);
+  reset(this, clear_all);
 }
 
 bool em8051::tick()
